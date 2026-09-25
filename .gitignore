@@ -1,0 +1,45 @@
+# --- Secrets -------------------------------------------------------------
+# The USDA FoodData Central key lives here. GitHub secret-scans public repos
+# and USDA deactivates keys it finds published, so this must never be pushed.
+# Secrets.example.plist IS committed as the template.
+Bites/Secrets.plist
+
+# --- Xcode ---------------------------------------------------------------
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Xcode 16 keeps per-user UI state inside the project bundle
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# --- Swift Package Manager ----------------------------------------------
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# --- CocoaPods / Carthage (unused today, harmless to pre-empt) ----------
+Pods/
+Carthage/Build/
+
+# --- Tooling -------------------------------------------------------------
+.claude/
+*.log
+
+# --- macOS ---------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*

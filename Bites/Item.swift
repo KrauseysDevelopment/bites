@@ -1,18 +1,2 @@
-//
-//  Item.swift
-//  Bites
-//
-//  Created by Nick Krause on 11/18/25.
-//
-
-import Foundation
-import SwiftData
-
-@Model
-final class Item {
-    var timestamp: Date
-    
-    init(timestamp: Date) {
-        self.timestamp = timestamp
-    }
-}
+// Item.swift — intentionally empty; original SwiftData template file removed.
+// All data models live in DayEntry.swift and DiaryStore.swift.
