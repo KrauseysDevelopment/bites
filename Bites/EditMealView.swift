@@ -17,6 +17,9 @@ struct EditMealView: View {
     @State private var fat: String
     @State private var loggedDate: Date
     @State private var showingDeleteConfirm = false
+    @State private var isZeroPoint: Bool
+    @State private var pointsOverride: String
+    @ObservedObject private var plan = PlanStore.shared
 
     init(meal: Meal, day: Date?) {
         original = meal
@@ -26,6 +29,8 @@ struct EditMealView: View {
         _protein  = State(initialValue: String(meal.protein))
         _carbs    = State(initialValue: String(meal.carbs))
         _fat      = State(initialValue: String(meal.fat))
+        _isZeroPoint = State(initialValue: meal.isZeroPoint)
+        _pointsOverride = State(initialValue: meal.pointsOverride.map { String($0) } ?? "")
 
         // Keep the original clock time but let the day be changed.
         let baseDay = day ?? Calendar.current.startOfDay(for: meal.loggedAt)
@@ -89,6 +94,28 @@ struct EditMealView: View {
                     }
                 }
 
+                if plan.trackingMode == .points {
+                    Section {
+                        Toggle("ZeroPoint food", isOn: $isZeroPoint)
+                            .tint(.green)
+                        HStack {
+                            Text("Points")
+                            Spacer()
+                            TextField("\(calculatedPoints)", text: $pointsOverride)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 84)
+                                .foregroundStyle(.orange)
+                                .fontWeight(.semibold)
+                        }
+                    } header: {
+                        Text("Bites Points")
+                    } footer: {
+                        Text(pointsFooter)
+                            .font(.caption)
+                    }
+                }
+
                 Section {
                     DatePicker("Logged", selection: $loggedDate)
                 } footer: {
@@ -136,9 +163,32 @@ struct EditMealView: View {
         updated.carbs = Int(carbs) ?? 0
         updated.fat = Int(fat) ?? 0
         updated.loggedAt = loggedDate
+        updated.isZeroPoint = isZeroPoint
+        let trimmedPoints = pointsOverride.trimmingCharacters(in: .whitespaces)
+        updated.pointsOverride = trimmedPoints.isEmpty ? nil : Int(trimmedPoints)
 
         store.updateMeal(updated, movingTo: loggedDate)
         dismiss()
+    }
+
+    /// Points from the formula using the numbers currently in the form.
+    private var calculatedPoints: Int {
+        var draft = original
+        draft.calories = Int(calories) ?? 0
+        draft.protein = Int(protein) ?? 0
+        draft.carbs = Int(carbs) ?? 0
+        draft.fat = Int(fat) ?? 0
+        draft.isZeroPoint = isZeroPoint
+        draft.pointsOverride = nil
+        return draft.points
+    }
+
+    private var pointsFooter: String {
+        var text = "Leave Points blank to use the calculated value (\(calculatedPoints))."
+        if BitesPoints.isEstimated(original) {
+            text += " Sugar or saturated fat was not on record for this item, so they were estimated."
+        }
+        return text
     }
 
     private func macroField(_ label: String, text: Binding<String>, unit: String, color: Color) -> some View {

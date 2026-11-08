@@ -14,6 +14,9 @@ final class WeighInReminder: NSObject, ObservableObject {
     @Published var weekday: Int { didSet { defaults.set(weekday, forKey: Keys.weekday); apply() } }
     @Published var hour: Int    { didSet { defaults.set(hour, forKey: Keys.hour); apply() } }
     @Published var minute: Int  { didSet { defaults.set(minute, forKey: Keys.minute); apply() } }
+    /// Daily weigh-ins give the trend chart the most to work with; weekly is
+    /// the gentler option.
+    @Published var isDaily: Bool { didSet { defaults.set(isDaily, forKey: Keys.daily); apply() } }
 
     /// Set when the user turned the reminder on but iOS notifications are off.
     @Published private(set) var permissionDenied = false
@@ -28,6 +31,7 @@ final class WeighInReminder: NSObject, ObservableObject {
         static let hour      = "WeighInReminderHour"
         static let minute    = "WeighInReminderMinute"
         static let dismissed = "WeighInCardDismissedOn"
+        static let daily     = "WeighInReminderDaily"
     }
 
     private override init() {
@@ -35,6 +39,7 @@ final class WeighInReminder: NSObject, ObservableObject {
         weekday   = defaults.int(forKey: Keys.weekday, default: 2)   // Monday
         hour      = defaults.int(forKey: Keys.hour, default: 8)
         minute    = defaults.int(forKey: Keys.minute, default: 0)
+        isDaily   = defaults.bool(forKey: Keys.daily)
         super.init()
         UNUserNotificationCenter.current().delegate = self
 
@@ -85,12 +90,12 @@ final class WeighInReminder: NSObject, ObservableObject {
         center.removePendingNotificationRequests(withIdentifiers: [identifier])
 
         let content = UNMutableNotificationContent()
-        content.title = "Weekly weigh-in"
+        content.title = isDaily ? "Morning weigh-in" : "Weekly weigh-in"
         content.body = "Time to step on the scale and log your weight in Bites."
         content.sound = .default
 
         var components = DateComponents()
-        components.weekday = weekday
+        if !isDaily { components.weekday = weekday }
         components.hour = hour
         components.minute = minute
 
@@ -118,7 +123,7 @@ final class WeighInReminder: NSObject, ObservableObject {
     /// been logged since, and the card has not been dismissed today.
     func isDue(lastWeighIn: Date?) -> Bool {
         guard isEnabled else { return false }
-        let anchor = currentWeekAnchor
+        let anchor = isDaily ? Calendar.current.startOfDay(for: Date()) : currentWeekAnchor
         if let lastWeighIn, lastWeighIn >= anchor { return false }
         if let dismissed = defaults.object(forKey: Keys.dismissed) as? Date,
            Calendar.current.isDateInToday(dismissed) {
@@ -158,7 +163,8 @@ final class WeighInReminder: NSObject, ObservableObject {
     var scheduleSummary: String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
-        return "\(weekdayName)s at \(formatter.string(from: timeOfDay))"
+        let time = formatter.string(from: timeOfDay)
+        return isDaily ? "every day at \(time)" : "\(weekdayName)s at \(time)"
     }
 }
 

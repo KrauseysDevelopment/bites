@@ -142,6 +142,7 @@ final class FoodSearchService: ObservableObject {
 
         do {
             if let item = try await OpenFoodFactsService.shared.lookupBarcode(barcode) {
+                RecentFoodsStore.shared.recordScan(item)
                 return item
             }
         } catch is CancellationError {
@@ -153,6 +154,7 @@ final class FoodSearchService: ObservableObject {
         if Secrets.hasUSDAKey {
             do {
                 if let item = try await USDAFoodService.shared.lookupBarcode(barcode) {
+                    RecentFoodsStore.shared.recordScan(item)
                     return item
                 }
             } catch is CancellationError {

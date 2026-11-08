@@ -30,6 +30,7 @@ struct OFFNutriments: Decodable {
     let sugars100g: Double?
     let sodium100g: Double?
     let salt100g: Double?
+    let saturatedFat100g: Double?
 
     enum CodingKeys: String, CodingKey {
         case energyKcal100g    = "energy-kcal_100g"
@@ -42,6 +43,7 @@ struct OFFNutriments: Decodable {
         case sugars100g        = "sugars_100g"
         case sodium100g        = "sodium_100g"
         case salt100g          = "salt_100g"
+        case saturatedFat100g  = "saturated-fat_100g"
     }
 
     var nutrition: Nutrition {
@@ -66,7 +68,8 @@ struct OFFNutriments: Decodable {
             fat: fat100g ?? 0,
             fiber: fiber100g,
             sugar: sugars100g,
-            sodium: sodiumMg
+            sodium: sodiumMg,
+            saturatedFat: saturatedFat100g
         )
     }
 }

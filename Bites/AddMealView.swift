@@ -19,6 +19,10 @@ struct AddMealView: View {
     @State private var showingScanner = false
     @State private var pendingBarcode: String?
     @State private var scannedFood: FoodItem?
+    /// The database meal last applied to the fields. Carries sugar, saturated
+    /// fat and the ZeroPoint flag, which the text fields cannot hold.
+    @State private var appliedMeal: Meal?
+    @ObservedObject private var plan = PlanStore.shared
 
     private var canSave: Bool {
         Int(calories) != nil || !foodName.trimmingCharacters(in: .whitespaces).isEmpty
@@ -91,6 +95,15 @@ struct AddMealView: View {
                     macroRow("Protein",  binding: $protein,  unit: "g",    color: .green)
                     macroRow("Carbs",    binding: $carbs,    unit: "g",    color: .purple)
                     macroRow("Fat",      binding: $fat,      unit: "g",    color: .amber)
+                    if plan.trackingMode == .points {
+                        HStack {
+                            Text("Bites Points").fontWeight(.semibold)
+                            Spacer()
+                            Text("\(draftMeal.points)")
+                                .font(.title3.bold())
+                                .foregroundStyle(draftMeal.points == 0 ? .green : .orange)
+                        }
+                    }
                 }
             }
             .navigationTitle("Log Meal")
@@ -151,11 +164,13 @@ struct AddMealView: View {
         carbs    = String(meal.carbs)
         fat      = String(meal.fat)
         selectedCategory = meal.category
+        appliedMeal = meal
     }
 
-    private func save() {
+    /// The meal as it would be saved right now.
+    private var draftMeal: Meal {
         let trimmed = foodName.trimmingCharacters(in: .whitespaces)
-        let meal = Meal(
+        var meal = Meal(
             name: trimmed.isEmpty ? selectedCategory.rawValue : trimmed,
             calories: Int(calories) ?? 0,
             protein: Int(protein) ?? 0,
@@ -163,7 +178,23 @@ struct AddMealView: View {
             fat: Int(fat) ?? 0,
             category: selectedCategory
         )
-        store.addMeal(meal)
+        if let base = appliedMeal {
+            let unchanged = base.calories == meal.calories && base.protein == meal.protein
+                && base.carbs == meal.carbs && base.fat == meal.fat
+            // Edited numbers scale the extra nutrients with calories; a
+            // ZeroPoint food stays zero only while it is untouched.
+            let ratio = base.calories > 0 ? Double(meal.calories) / Double(base.calories) : 1
+            meal.sugar = base.sugar.map { $0 * ratio }
+            meal.saturatedFat = base.saturatedFat.map { $0 * ratio }
+            meal.fiber = base.fiber.map { $0 * ratio }
+            meal.isZeroPoint = unchanged && base.isZeroPoint
+            meal.servingGrams = base.servingGrams
+        }
+        return meal
+    }
+
+    private func save() {
+        store.addMeal(draftMeal)
         dismiss()
     }
 

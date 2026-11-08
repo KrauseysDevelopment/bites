@@ -10,6 +10,7 @@ struct FoodSearchView: View {
     @State private var selectedFood: FoodItem?
     @State private var showingScanner = false
     @State private var pendingBarcode: String?
+    @State private var idleList: IdleList = RecentFoodsStore.shared.favorites.isEmpty ? .recent : .favorites
 
     /// Category applied to the meal handed back to the caller.
     var category: MealCategory = .snack
@@ -110,34 +111,80 @@ struct FoodSearchView: View {
             }
         }
 
-        if !recents.favorites.isEmpty {
-            Section("Favorites") {
-                ForEach(recents.favorites) { entry in
-                    entryRow(entry)
-                }
-            }
-        }
-
-        if !recents.recents.isEmpty {
+        if recents.hasAnything {
             Section {
-                ForEach(recents.recents) { entry in
-                    entryRow(entry)
+                Picker("Show", selection: $idleList) {
+                    ForEach(IdleList.allCases) { list in
+                        Text(list.rawValue).tag(list)
+                    }
                 }
-            } header: {
-                HStack {
-                    Text("Recent")
-                    Spacer()
-                    Button("Clear") { recents.clearRecents() }
-                        .font(.caption)
-                        .textCase(nil)
+                .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+            }
+
+            switch idleList {
+            case .recent:
+                if recents.recents.isEmpty {
+                    idleHint("Foods you log show up here.", icon: "clock")
+                } else {
+                    Section {
+                        ForEach(recents.recents) { entry in
+                            entryRow(entry)
+                        }
+                    } header: {
+                        HStack {
+                            Text("Recent")
+                            Spacer()
+                            Button("Clear") { recents.clearRecents() }
+                                .font(.caption)
+                                .textCase(nil)
+                        }
+                    }
+                }
+            case .favorites:
+                if recents.favorites.isEmpty {
+                    idleHint("Swipe right on any food, or tap the star when adding it, to keep it here.", icon: "star")
+                } else {
+                    Section("Favorites") {
+                        ForEach(recents.favorites) { entry in
+                            entryRow(entry)
+                        }
+                    }
+                }
+            case .scanned:
+                if recents.scanned.isEmpty {
+                    idleHint("Every barcode you scan is saved here for next time.", icon: "barcode.viewfinder")
+                } else {
+                    Section {
+                        ForEach(recents.scanned) { entry in
+                            entryRow(entry, scannedList: true)
+                        }
+                    } header: {
+                        Text("Scanned")
+                    }
                 }
             }
-        }
-
-        if !recents.hasAnything && !service.needsAPIKey {
+        } else if !service.needsAPIKey {
             Section {
                 emptyState
             }
+        }
+    }
+
+    enum IdleList: String, CaseIterable, Identifiable {
+        case recent = "Recent"
+        case favorites = "Favorites"
+        case scanned = "Scanned"
+        var id: String { rawValue }
+    }
+
+    private func idleHint(_ text: String, icon: String) -> some View {
+        Section {
+            Label(text, systemImage: icon)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .listRowBackground(Color.clear)
         }
     }
 
@@ -224,14 +271,16 @@ struct FoodSearchView: View {
         }
     }
 
-    private func entryRow(_ entry: RecentFoodsStore.Entry) -> some View {
+    private func entryRow(_ entry: RecentFoodsStore.Entry, scannedList: Bool = false) -> some View {
         Button {
             selectedFood = entry.food
         } label: {
             FoodRowContent(
                 food: entry.food,
                 isFavorite: entry.isFavorite,
-                trailingNote: entry.lastGrams.map { "\(Int($0.rounded())) g last time" }
+                trailingNote: scannedList
+                    ? entry.scannedAt.map { "scanned " + $0.formatted(.relative(presentation: .named)) }
+                    : entry.lastGrams.map { "\(Int($0.rounded())) g last time" }
             )
         }
         .buttonStyle(.plain)
@@ -245,7 +294,11 @@ struct FoodSearchView: View {
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
-                recents.remove(entry.food)
+                if scannedList {
+                    recents.removeFromScanned(entry.food)
+                } else {
+                    recents.remove(entry.food)
+                }
             } label: {
                 Label("Remove", systemImage: "trash")
             }

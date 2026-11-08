@@ -312,6 +312,7 @@ struct SavedMeal: Identifiable, Codable, Hashable {
     var totalProtein: Int  { items.reduce(0) { $0 + $1.meal.protein } }
     var totalCarbs: Int    { items.reduce(0) { $0 + $1.meal.carbs } }
     var totalFat: Int      { items.reduce(0) { $0 + $1.meal.fat } }
+    var totalPoints: Int   { items.reduce(0) { $0 + $1.meal.points } }
 
     init(id: UUID = UUID(), name: String, items: [SavedMealItem]) {
         self.id = id
@@ -359,7 +360,12 @@ extension Meal {
             carbs: Int((Double(carbs) * multiplier).rounded()),
             fat: Int((Double(fat) * multiplier).rounded()),
             category: category,
-            servingGrams: servingGrams
+            servingGrams: servingGrams,
+            sugar: sugar.map { $0 * multiplier },
+            saturatedFat: saturatedFat.map { $0 * multiplier },
+            fiber: fiber.map { $0 * multiplier },
+            isZeroPoint: isZeroPoint,
+            pointsOverride: pointsOverride.map { Int((Double($0) * multiplier).rounded()) }
         )
     }
 }

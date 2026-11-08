@@ -39,6 +39,9 @@ struct FitnessView: View {
                         calorieGoal: workouts.activeCalorieGoal
                     )
 
+                    NavigationLink { AchievementsView() } label: { AchievementsSummaryCard() }
+                        .buttonStyle(.plain)
+
                     TodayGoalCard(
                         activity: todayActivity,
                         minutesGoal: workouts.exerciseMinutesGoal,

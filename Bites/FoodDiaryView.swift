@@ -5,6 +5,7 @@ struct FoodDiaryView: View {
     @EnvironmentObject var store: DiaryStore
     @State private var showingAddMeal = false
     @State private var editingMeal: Meal?
+    @ObservedObject private var plan = PlanStore.shared
 
     private var groupedDays: [(date: Date, meals: [Meal])] {
         let sortedDays = store.days.sorted { $0.date > $1.date }
@@ -72,8 +73,9 @@ struct FoodDiaryView: View {
                                 .textCase(nil)
                             Spacer()
                             let totalCal = group.meals.reduce(0) { $0 + $1.calories }
+                            let totalPts = group.meals.reduce(0) { $0 + $1.points }
                             if totalCal > 0 {
-                                Text("\(totalCal) kcal")
+                                Text(plan.trackingMode == .points ? "\(totalPts) pts" : "\(totalCal) kcal")
                                     .font(.subheadline.bold())
                                     .foregroundStyle(.orange)
                                     .padding(.horizontal, 11)
@@ -145,6 +147,7 @@ struct FoodDiaryView: View {
 // MARK: - Meal Card
 struct MealCard: View {
     let meal: Meal
+    @ObservedObject private var plan = PlanStore.shared
 
     var body: some View {
         HStack(spacing: 0) {
@@ -165,12 +168,21 @@ struct MealCard: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 0) {
-                        Text("\(meal.calories)")
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
-                            .foregroundStyle(.orange)
-                        Text("kcal")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        if plan.trackingMode == .points {
+                            Text("\(meal.points)")
+                                .font(.system(size: 26, weight: .bold, design: .rounded))
+                                .foregroundStyle(meal.points == 0 ? .green : .orange)
+                            Text(meal.points == 0 && meal.isZeroPoint ? "ZeroPoint" : "pts · \(meal.calories) kcal")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("\(meal.calories)")
+                                .font(.system(size: 26, weight: .bold, design: .rounded))
+                                .foregroundStyle(.orange)
+                            Text("kcal")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 

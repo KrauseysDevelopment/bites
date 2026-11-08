@@ -101,6 +101,7 @@ private enum NutrientID {
     static let sugarsTotal = 2000
     static let sugarsNLEA = 1063   // what most Branded records actually carry
     static let sodium = 1093
+    static let saturatedFat = 1258
 }
 
 // MARK: - Service
@@ -303,7 +304,8 @@ actor USDAFoodService {
             fat: values[NutrientID.fat] ?? 0,
             fiber: values[NutrientID.fiber],
             sugar: values[NutrientID.sugarsTotal] ?? values[NutrientID.sugarsNLEA],
-            sodium: values[NutrientID.sodium]
+            sodium: values[NutrientID.sodium],
+            saturatedFat: values[NutrientID.saturatedFat]
         )
     }
 

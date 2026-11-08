@@ -11,6 +11,8 @@ struct ServingPickerView: View {
     let onConfirm: (Meal, Double) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var recents = RecentFoodsStore.shared
+    @ObservedObject private var plan = PlanStore.shared
 
     @State private var amount: String
     @State private var unit: ServingUnit
@@ -188,6 +190,9 @@ struct ServingPickerView: View {
                 }
 
                 Section("This Portion") {
+                    if plan.trackingMode == .points {
+                        pointsRow
+                    }
                     macroRow("Calories", value: scaled.calories, unit: "kcal", color: .orange)
                     macroRow("Protein",  value: scaled.protein,  unit: "g", color: .green)
                     macroRow("Carbs",    value: scaled.carbs,    unit: "g", color: .purple)
@@ -215,6 +220,16 @@ struct ServingPickerView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        recents.toggleFavorite(food)
+                    } label: {
+                        Image(systemName: recents.isFavorite(food) ? "star.fill" : "star")
+                            .foregroundStyle(.yellow)
+                    }
+                    .accessibilityLabel(recents.isFavorite(food) ? "Remove from favorites" : "Add to favorites")
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
                         let meal = food.meal(grams: totalGrams, category: category, portionName: portionName)
@@ -225,6 +240,29 @@ struct ServingPickerView: View {
                     .disabled(!isValid)
                 }
             }
+        }
+    }
+
+    private var isZeroPoint: Bool {
+        plan.zeroPointFoodsEnabled && ZeroPointFoods.qualifies(food)
+    }
+
+    private var pointsRow: some View {
+        HStack {
+            Text("Bites Points")
+                .fontWeight(.semibold)
+            if isZeroPoint {
+                Text("ZeroPoint")
+                    .font(.caption2.bold())
+                    .foregroundStyle(.green)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Color.green.opacity(0.14), in: Capsule())
+            }
+            Spacer()
+            Text("\(BitesPoints.points(for: food, grams: totalGrams))")
+                .font(.title3.bold())
+                .foregroundStyle(isZeroPoint ? .green : .orange)
         }
     }
 

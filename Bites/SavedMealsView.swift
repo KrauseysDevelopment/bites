@@ -21,7 +21,10 @@ struct SavedMealsView: View {
                                     protein:  savedMeal.totalProtein,
                                     carbs:    savedMeal.totalCarbs,
                                     fat:      savedMeal.totalFat,
-                                    category: MealCategory.suggested()
+                                    category: MealCategory.suggested(),
+                                    // Sum of the items' own points, so a zero-point
+                                    // item inside the meal stays zero.
+                                    pointsOverride: savedMeal.totalPoints
                                 )
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 store.addMeal(combined)

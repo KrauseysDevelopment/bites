@@ -17,6 +17,16 @@ struct Meal: Identifiable, Codable, Hashable {
     /// When this meal was logged. Used to order the diary within a day.
     var loggedAt: Date
 
+    // Extra nutrients for Bites Points. nil means the source did not say, in
+    // which case the points formula estimates from fat and carbs.
+    var sugar: Double?
+    var saturatedFat: Double?
+    var fiber: Double?
+    /// Whole fruit, vegetables, lean protein etc. Costs 0 points.
+    var isZeroPoint: Bool
+    /// Set by hand in Edit Meal, or by a saved meal that knows its own total.
+    var pointsOverride: Int?
+
     init(
         id: UUID = UUID(),
         name: String,
@@ -26,7 +36,12 @@ struct Meal: Identifiable, Codable, Hashable {
         fat: Int = 0,
         category: MealCategory = .breakfast,
         servingGrams: Double? = nil,
-        loggedAt: Date = Date()
+        loggedAt: Date = Date(),
+        sugar: Double? = nil,
+        saturatedFat: Double? = nil,
+        fiber: Double? = nil,
+        isZeroPoint: Bool = false,
+        pointsOverride: Int? = nil
     ) {
         self.id = id
         self.name = name
@@ -37,13 +52,22 @@ struct Meal: Identifiable, Codable, Hashable {
         self.category = category
         self.servingGrams = servingGrams
         self.loggedAt = loggedAt
+        self.sugar = sugar
+        self.saturatedFat = saturatedFat
+        self.fiber = fiber
+        self.isZeroPoint = isZeroPoint
+        self.pointsOverride = pointsOverride
     }
+
+    /// Bites Points for this meal. See BitesPoints.swift for the formula.
+    var points: Int { BitesPoints.points(for: self) }
 
     // Tolerant decoding so data saved by older builds still loads.
     // NOTE: the previous model declared `let id = UUID()`, which Swift encodes
     // but never decodes, so every relaunch minted fresh IDs and broke deletes.
     private enum CodingKeys: String, CodingKey {
         case id, name, calories, protein, carbs, fat, category, servingGrams, loggedAt
+        case sugar, saturatedFat, fiber, isZeroPoint, pointsOverride
     }
 
     init(from decoder: Decoder) throws {
@@ -57,6 +81,11 @@ struct Meal: Identifiable, Codable, Hashable {
         category     = (try? c.decode(MealCategory.self,  forKey: .category)) ?? .breakfast
         servingGrams = try c.decodeIfPresent(Double.self, forKey: .servingGrams)
         loggedAt     = try c.decodeIfPresent(Date.self,   forKey: .loggedAt) ?? Date()
+        sugar          = try c.decodeIfPresent(Double.self, forKey: .sugar)
+        saturatedFat   = try c.decodeIfPresent(Double.self, forKey: .saturatedFat)
+        fiber          = try c.decodeIfPresent(Double.self, forKey: .fiber)
+        isZeroPoint    = try c.decodeIfPresent(Bool.self,   forKey: .isZeroPoint) ?? false
+        pointsOverride = try c.decodeIfPresent(Int.self,    forKey: .pointsOverride)
     }
 }
 
@@ -112,6 +141,7 @@ struct DayEntry: Identifiable, Codable, Hashable {
     var totalProtein: Int  { meals.reduce(0) { $0 + $1.protein } }
     var totalCarbs: Int    { meals.reduce(0) { $0 + $1.carbs } }
     var totalFat: Int      { meals.reduce(0) { $0 + $1.fat } }
+    var totalPoints: Int   { meals.reduce(0) { $0 + $1.points } }
 
     var isEmpty: Bool { meals.isEmpty && waterGlasses == 0 }
 

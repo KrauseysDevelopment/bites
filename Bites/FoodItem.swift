@@ -73,6 +73,9 @@ struct Nutrition: Codable, Hashable {
     var fiber: Double?
     var sugar: Double?
     var sodium: Double?   // milligrams
+    /// Saturated fat in grams. Feeds the Bites Points formula. Added after
+    /// launch, so older saved foods decode it as nil.
+    var saturatedFat: Double? = nil
 
     var isUsable: Bool { calories > 0 || protein > 0 || carbs > 0 || fat > 0 }
 
@@ -85,7 +88,8 @@ struct Nutrition: Codable, Hashable {
             fat: fat * factor,
             fiber: fiber.map { $0 * factor },
             sugar: sugar.map { $0 * factor },
-            sodium: sodium.map { $0 * factor }
+            sodium: sodium.map { $0 * factor },
+            saturatedFat: saturatedFat.map { $0 * factor }
         )
     }
 }
@@ -140,7 +144,11 @@ struct FoodItem: Identifiable, Codable, Hashable {
             carbs: Int(scaled.carbs.rounded()),
             fat: Int(scaled.fat.rounded()),
             category: category,
-            servingGrams: servingGrams
+            servingGrams: servingGrams,
+            sugar: scaled.sugar,
+            saturatedFat: scaled.saturatedFat,
+            fiber: scaled.fiber,
+            isZeroPoint: ZeroPointFoods.qualifies(self)
         )
     }
 }

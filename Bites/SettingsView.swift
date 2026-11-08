@@ -7,10 +7,16 @@ struct SettingsView: View {
     @EnvironmentObject var workouts: WorkoutStore
     @State private var usdaKeyInput = Secrets.storedKeyForDisplay
     @StateObject private var reminder = WeighInReminder.shared
+    @ObservedObject private var plan = PlanStore.shared
+    @ObservedObject private var reminders = ReminderCenter.shared
+    @State private var showingPlanSetup = false
 
     var body: some View {
         NavigationStack {
             List {
+                planSection
+                remindersSection
+
                 // MARK: - Appearance
                 Section {
                     SettingsToggleRow(
@@ -94,11 +100,20 @@ struct SettingsView: View {
                 Section {
                     HStack(spacing: 12) {
                         SettingsIconView(icon: "scalemass.fill", color: .indigo)
-                        Toggle("Weekly Weigh-in", isOn: $reminder.isEnabled)
+                        Toggle("Weigh-in Reminder", isOn: $reminder.isEnabled)
                             .tint(.orange)
                     }
 
                     if reminder.isEnabled {
+                        Picker("How often", selection: $reminder.isDaily) {
+                            Text("Daily").tag(true)
+                            Text("Weekly").tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.leading, 46)
+                    }
+
+                    if reminder.isEnabled && !reminder.isDaily {
                         HStack(spacing: 12) {
                             SettingsIconView(icon: "calendar", color: .blue)
                             Text("Day")
@@ -111,7 +126,9 @@ struct SettingsView: View {
                             .pickerStyle(.menu)
                             .labelsHidden()
                         }
+                    }
 
+                    if reminder.isEnabled {
                         HStack(spacing: 12) {
                             SettingsIconView(icon: "clock.fill", color: .green)
                             DatePicker(
@@ -147,8 +164,8 @@ struct SettingsView: View {
                     SettingsSectionHeader("Weigh-in Reminder")
                 } footer: {
                     Text(reminder.isEnabled
-                         ? "Reminding you \(reminder.scheduleSummary). A card also appears on the Fitness tab until you log that week."
-                         : "Get a weekly nudge to step on the scale.")
+                         ? "Reminding you \(reminder.scheduleSummary). A card also appears on the Fitness tab until you log."
+                         : "Get a daily or weekly nudge to step on the scale.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -217,6 +234,116 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .preferredColorScheme(isDarkMode ? .dark : .light)
+            .sheet(isPresented: $showingPlanSetup) {
+                PlanSetupView()
+            }
+        }
+    }
+
+    private var planSection: some View {
+        Section {
+            Picker("Tracking", selection: $plan.trackingMode) {
+                ForEach(TrackingMode.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+
+            Button {
+                showingPlanSetup = true
+            } label: {
+                HStack(spacing: 12) {
+                    SettingsIconView(icon: "function", color: .orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Calorie & Deficit Calculator")
+                            .foregroundStyle(.primary)
+                        Text(plan.hasCompletedSetup
+                             ? "\(store.calorieGoal) kcal · \(plan.dailyPointsBudget) pts a day"
+                             : "Work out your calories, macros and points")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.bold())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            if plan.trackingMode == .points {
+                GoalRow(icon: "circle.hexagongrid.fill", iconColor: .orange, label: "Daily Points",
+                        value: $plan.dailyPointsBudget, placeholder: "30", unit: "pts")
+                GoalRow(icon: "calendar", iconColor: .purple, label: "Weekly Points",
+                        value: $plan.weeklyPointsAllowance, placeholder: "28", unit: "pts")
+                HStack(spacing: 12) {
+                    SettingsIconView(icon: "leaf.circle.fill", color: .green)
+                    Toggle("ZeroPoint Foods", isOn: $plan.zeroPointFoodsEnabled)
+                        .tint(.orange)
+                }
+                HStack(spacing: 12) {
+                    SettingsIconView(icon: "arrow.uturn.forward.circle.fill", color: .blue)
+                    Toggle("Roll Over Unused Points", isOn: $plan.rolloverEnabled)
+                        .tint(.orange)
+                }
+            }
+        } header: {
+            SettingsSectionHeader("Your Plan")
+        } footer: {
+            Text(plan.trackingMode == .points
+                 ? "Points weigh calories, saturated fat and sugar up and protein down. Plain fruit, vegetables, eggs, lean poultry, fish, beans and nonfat plain yogurt count as zero. Up to \(PlanStore.maxRolloverPerDay) unused daily points a day roll into your weekly points."
+                 : "Track calories and macros against the goals below.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var remindersSection: some View {
+        Section {
+            HStack(spacing: 12) {
+                SettingsIconView(icon: "fork.knife", color: .orange)
+                Toggle("Evening Log Nudge", isOn: $reminders.logNudgeEnabled)
+                    .tint(.orange)
+            }
+            if reminders.logNudgeEnabled {
+                DatePicker("Nudge at", selection: Binding(
+                    get: { reminders.logNudgeTime },
+                    set: { reminders.logNudgeTime = $0 }
+                ), displayedComponents: .hourAndMinute)
+                .padding(.leading, 46)
+            }
+
+            HStack(spacing: 12) {
+                SettingsIconView(icon: "flame.fill", color: .red)
+                Toggle("Streak at Risk", isOn: $reminders.streakAlertEnabled)
+                    .tint(.orange)
+            }
+            if reminders.streakAlertEnabled {
+                DatePicker("Warn at", selection: Binding(
+                    get: { reminders.streakAlertTime },
+                    set: { reminders.streakAlertTime = $0 }
+                ), displayedComponents: .hourAndMinute)
+                .padding(.leading, 46)
+            }
+
+            HStack(spacing: 12) {
+                SettingsIconView(icon: "rosette", color: .purple)
+                Toggle("Achievement Alerts", isOn: $reminders.achievementAlertsEnabled)
+                    .tint(.orange)
+            }
+
+            if reminders.permissionDenied {
+                Button("Notifications are off for Bites. Open iOS Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                .font(.caption.bold())
+                .foregroundStyle(.orange)
+            }
+        } header: {
+            SettingsSectionHeader("Reminders")
+        } footer: {
+            Text("The nudge only fires on days nothing has been logged by that time. The streak alert only fires while you have a streak going and today is still empty.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }
