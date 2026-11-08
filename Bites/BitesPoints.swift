@@ -281,7 +281,29 @@ struct BodyProfile: Codable, Equatable {
     var heightInches: Int = 70
     var weightPounds: Double = 185
     var activity: ActivityLevel = .light
-    var goal: WeightGoal = .loseSlow
+    /// Fallback pace when no goal weight is set. Superseded by goal weight + date.
+    var goal: WeightGoal = .maintain
+    var goalWeightPounds: Double?
+    var targetDate: Date?
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case sex, age, heightInches, weightPounds, activity, goal, goalWeightPounds, targetDate
+    }
+
+    // Tolerant, so a profile saved before goal weight existed still loads.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sex              = (try? c.decode(BiologicalSex.self, forKey: .sex)) ?? .male
+        age              = try c.decodeIfPresent(Int.self, forKey: .age) ?? 35
+        heightInches     = try c.decodeIfPresent(Int.self, forKey: .heightInches) ?? 70
+        weightPounds     = try c.decodeIfPresent(Double.self, forKey: .weightPounds) ?? 185
+        activity         = (try? c.decode(ActivityLevel.self, forKey: .activity)) ?? .light
+        goal             = (try? c.decode(WeightGoal.self, forKey: .goal)) ?? .maintain
+        goalWeightPounds = try c.decodeIfPresent(Double.self, forKey: .goalWeightPounds)
+        targetDate       = try c.decodeIfPresent(Date.self, forKey: .targetDate)
+    }
 }
 
 /// Mifflin-St Jeor, the equation most clinicians and calorie apps use today.
@@ -303,7 +325,56 @@ struct CalorieCalculation {
     /// Commonly cited floors below which intake should be medically supervised.
     var minimumSafeCalories: Int { profile.sex == .male ? 1500 : 1200 }
 
-    var unclampedTarget: Int { tdee + profile.goal.dailyCalorieAdjustment }
+    // MARK: Goal weight and date
+
+    /// Most fitness guidance caps healthy loss at 2 lb a week; gain at 1.
+    static let maxLossPerWeek = 2.0
+    static let maxGainPerWeek = 1.0
+
+    /// Positive to lose, negative to gain. nil when no goal weight is set.
+    var poundsToChange: Double? {
+        guard let goal = profile.goalWeightPounds, goal > 0 else { return nil }
+        return profile.weightPounds - goal
+    }
+
+    var weeksToTarget: Double? {
+        guard let date = profile.targetDate else { return nil }
+        let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()),
+                                                   to: Calendar.current.startOfDay(for: date)).day ?? 0
+        return max(Double(days), 1) / 7
+    }
+
+    /// Pace the goal and date would need, before any cap. Negative = loss.
+    var requiredPoundsPerWeek: Double? {
+        guard let change = poundsToChange, let weeks = weeksToTarget else { return nil }
+        if abs(change) < 0.5 { return 0 }
+        return -change / weeks
+    }
+
+    /// Pace actually planned: the goal-date pace held to the safe limits, or
+    /// the fallback pace when no goal weight is set.
+    var plannedPoundsPerWeek: Double {
+        // No goal weight means maintain.
+        guard let required = requiredPoundsPerWeek else { return 0 }
+        return min(Self.maxGainPerWeek, max(-Self.maxLossPerWeek, required))
+    }
+
+    /// True when the chosen date was too soon and the pace was capped.
+    var paceWasCapped: Bool {
+        guard let required = requiredPoundsPerWeek else { return false }
+        return required < -Self.maxLossPerWeek || required > Self.maxGainPerWeek
+    }
+
+    /// Soonest the goal weight can be reached at the safe maximum pace.
+    var earliestSafeDate: Date? {
+        guard let change = poundsToChange, abs(change) >= 0.5 else { return nil }
+        let rate = change > 0 ? Self.maxLossPerWeek : Self.maxGainPerWeek
+        let days = Int((abs(change) / rate * 7).rounded(.up))
+        return Calendar.current.date(byAdding: .day, value: days, to: Calendar.current.startOfDay(for: Date()))
+    }
+
+    /// 3,500 kcal ≈ 1 lb, so each pound a week is 500 kcal a day.
+    var unclampedTarget: Int { tdee + Int((plannedPoundsPerWeek * 500).rounded()) }
 
     var targetCalories: Int { max(minimumSafeCalories, unclampedTarget) }
 

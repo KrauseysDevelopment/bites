@@ -46,8 +46,8 @@ struct ContentView: View {
                         calorieRingCard
                     }
                     macroRow
-                    weighInCard
                     waterCard
+                    weighInCard
                     weeklyCard
                 }
                 .padding(.horizontal, 16)

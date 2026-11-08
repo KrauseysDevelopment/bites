@@ -34,3 +34,8 @@
   - BitesApp split into BitesApp + RootView + DerivedStateRefresher to keep type-checking fast.
 - Verified here: brace balance on all files; ZeroPoint matcher run against 40+ real USDA names. **Not compiled** — needs Nick's Xcode build.
 - Next: Nick builds sim + device, reports errors; capture device-install error; merge branch to main once green.
+
+### 2026-11-07 (cont.)
+- Feature branch built and ran (Nick's screenshot of new Settings).
+- Today: Water card now above Weight. Settings: Food Database section hidden when the key ships in Secrets.plist; weigh-in Frequency (Daily/Weekly) shown as its own row once the reminder is on.
+- Calculator: optional goal weight + "reach it by" date. Pace = (current − goal) / weeks, capped at 2 lb/wk loss, 1 lb/wk gain; capped plans show the earliest safe date with a one-tap fix. Blank goal = maintain. BodyProfile decode made tolerant for the new fields.

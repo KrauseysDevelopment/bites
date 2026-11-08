@@ -105,12 +105,17 @@ struct SettingsView: View {
                     }
 
                     if reminder.isEnabled {
-                        Picker("How often", selection: $reminder.isDaily) {
-                            Text("Daily").tag(true)
-                            Text("Weekly").tag(false)
+                        HStack(spacing: 12) {
+                            SettingsIconView(icon: "repeat", color: .purple)
+                            Text("Frequency")
+                            Spacer()
+                            Picker("Frequency", selection: $reminder.isDaily) {
+                                Text("Daily").tag(true)
+                                Text("Weekly").tag(false)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 150)
                         }
-                        .pickerStyle(.segmented)
-                        .padding(.leading, 46)
                     }
 
                     if reminder.isEnabled && !reminder.isDaily {
@@ -171,50 +176,53 @@ struct SettingsView: View {
                 }
 
                 // MARK: - Food Database
-                Section {
-                    HStack(spacing: 12) {
-                        SettingsIconView(icon: "key.fill", color: .green)
-                        Text("USDA API Key")
-                        Spacer()
-                        if Secrets.keyIsBundled {
-                            Text("From Secrets.plist")
-                                .font(.caption)
-                                .foregroundStyle(.green)
-                        } else {
-                            SecureField("Paste key", text: $usdaKeyInput)
-                                .multilineTextAlignment(.trailing)
-                                .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
-                                .onSubmit { Secrets.storeUSDAKey(usdaKeyInput) }
-                                .onChange(of: usdaKeyInput) { _, newValue in
-                                    Secrets.storeUSDAKey(newValue)
-                                }
+                // Hidden when the key ships in Secrets.plist: nothing to set.
+                if !Secrets.keyIsBundled {
+                    Section {
+                        HStack(spacing: 12) {
+                            SettingsIconView(icon: "key.fill", color: .green)
+                            Text("USDA API Key")
+                            Spacer()
+                            if Secrets.keyIsBundled {
+                                Text("From Secrets.plist")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                            } else {
+                                SecureField("Paste key", text: $usdaKeyInput)
+                                    .multilineTextAlignment(.trailing)
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.never)
+                                    .onSubmit { Secrets.storeUSDAKey(usdaKeyInput) }
+                                    .onChange(of: usdaKeyInput) { _, newValue in
+                                        Secrets.storeUSDAKey(newValue)
+                                    }
+                            }
                         }
-                    }
 
-                    HStack(spacing: 12) {
-                        SettingsIconView(
-                            icon: Secrets.hasUSDAKey ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
-                            color: Secrets.hasUSDAKey ? .green : .orange
-                        )
-                        Text(Secrets.hasUSDAKey ? "Food search is active" : "Food search needs a key")
-                            .font(.subheadline)
-                            .foregroundStyle(Secrets.hasUSDAKey ? .primary : .secondary)
-                    }
-
-                    if !Secrets.hasUSDAKey {
-                        Link(destination: URL(string: "https://fdc.nal.usda.gov/api-key-signup/")!) {
-                            Label("Get a free key from USDA", systemImage: "arrow.up.right.square")
+                        HStack(spacing: 12) {
+                            SettingsIconView(
+                                icon: Secrets.hasUSDAKey ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
+                                color: Secrets.hasUSDAKey ? .green : .orange
+                            )
+                            Text(Secrets.hasUSDAKey ? "Food search is active" : "Food search needs a key")
                                 .font(.subheadline)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Secrets.hasUSDAKey ? .primary : .secondary)
                         }
+
+                        if !Secrets.hasUSDAKey {
+                            Link(destination: URL(string: "https://fdc.nal.usda.gov/api-key-signup/")!) {
+                                Label("Get a free key from USDA", systemImage: "arrow.up.right.square")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    } header: {
+                        SettingsSectionHeader("Food Database")
+                    } footer: {
+                        Text("Whole foods and branded products come from USDA FoodData Central. Barcode scanning uses Open Food Facts and works without a key.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                } header: {
-                    SettingsSectionHeader("Food Database")
-                } footer: {
-                    Text("Whole foods and branded products come from USDA FoodData Central. Barcode scanning uses Open Food Facts and works without a key.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
 
                 // MARK: - App Info

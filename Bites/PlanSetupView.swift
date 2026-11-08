@@ -14,6 +14,7 @@ struct PlanSetupView: View {
     @State private var profile: BodyProfile
     @State private var mode: TrackingMode
     @State private var weightText: String
+    @State private var goalWeightText: String
     @State private var feet: Int
     @State private var inches: Int
 
@@ -25,6 +26,7 @@ struct PlanSetupView: View {
         _profile = State(initialValue: start)
         _mode = State(initialValue: PlanStore.shared.hasCompletedSetup ? PlanStore.shared.trackingMode : .points)
         _weightText = State(initialValue: Self.format(start.weightPounds))
+        _goalWeightText = State(initialValue: start.goalWeightPounds.map { Self.format($0) } ?? "")
         _feet = State(initialValue: start.heightInches / 12)
         _inches = State(initialValue: start.heightInches % 12)
     }
@@ -119,12 +121,7 @@ struct PlanSetupView: View {
                     Text("Count everyday movement too. If you are unsure, pick the lower level; workouts you log can be eaten back.")
                 }
 
-                Section("Goal") {
-                    Picker("Goal", selection: $profile.goal) {
-                        ForEach(WeightGoal.allCases) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.menu)
-                }
+                goalSection
 
                 Section("How do you want to track?") {
                     ForEach(TrackingMode.allCases) { option in
@@ -174,10 +171,86 @@ struct PlanSetupView: View {
                     profile.weightPounds = w
                 }
             }
+            .onChange(of: goalWeightText) { _, newValue in
+                let goal = Double(newValue.replacingOccurrences(of: ",", with: "."))
+                profile.goalWeightPounds = (goal ?? 0) > 0 ? goal : nil
+                // First time a goal goes in, suggest a date at a steady 1 lb a week.
+                if let goal, goal > 0, profile.targetDate == nil {
+                    let weeks = max(1, abs(profile.weightPounds - goal))
+                    profile.targetDate = Calendar.current.date(byAdding: .day, value: Int(weeks * 7), to: Date())
+                }
+            }
             .onChange(of: feet) { _, _ in profile.heightInches = feet * 12 + inches }
             .onChange(of: inches) { _, _ in profile.heightInches = feet * 12 + inches }
         }
         .interactiveDismissDisabled(isFirstLaunch)
+    }
+
+    // MARK: - Goal
+
+    private var hasGoal: Bool {
+        guard let change = calc.poundsToChange else { return false }
+        return abs(change) >= 0.5
+    }
+
+    private var targetDateBinding: Binding<Date> {
+        Binding(
+            get: { profile.targetDate ?? Calendar.current.date(byAdding: .month, value: 3, to: Date()) ?? Date() },
+            set: { profile.targetDate = $0 }
+        )
+    }
+
+    private var goalSection: some View {
+        Section {
+            HStack {
+                Text("Goal weight")
+                Spacer()
+                TextField("Optional", text: $goalWeightText)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 90)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.orange)
+                Text("lb").foregroundStyle(.secondary)
+            }
+
+            if hasGoal {
+                DatePicker(
+                    "Reach it by",
+                    selection: targetDateBinding,
+                    in: (Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date())...,
+                    displayedComponents: .date
+                )
+
+                if let change = calc.poundsToChange, let required = calc.requiredPoundsPerWeek {
+                    HStack {
+                        Text(change > 0 ? "Pace to lose \(Self.format(abs(change))) lb" : "Pace to gain \(Self.format(abs(change))) lb")
+                        Spacer()
+                        Text("\(Self.format(abs(required))) lb / week")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(calc.paceWasCapped ? .red : .secondary)
+                    }
+                }
+
+                if calc.paceWasCapped, let earliest = calc.earliestSafeDate {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("That's faster than the recommended \(Self.format(CalorieCalculation.maxLossPerWeek)) lb a week, so your plan is capped at that pace.", systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Button("Use \(earliest.formatted(date: .abbreviated, time: .omitted)) instead") {
+                            profile.targetDate = earliest
+                        }
+                        .font(.caption.bold())
+                    }
+                }
+            }
+        } header: {
+            Text("Goal")
+        } footer: {
+            Text(hasGoal
+                 ? "Bites works out the daily deficit needed to hit your goal weight by that date, up to a safe maximum of 2 lb a week."
+                 : "Leave blank to maintain your current weight.")
+        }
     }
 
     // MARK: - Results
